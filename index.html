@@ -40,24 +40,47 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* 翻牌動畫容器與效果 */
-        .flip-board-container {
+        /* Fliqlo 翻頁鐘風格 */
+        .fliqlo-panel {
+            background-color: #111111;
+            color: #f1f1f1;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), inset 0 2px 4px rgba(255, 255, 255, 0.1);
+            position: relative;
+            border-bottom: 4px solid #000;
             perspective: 1000px;
         }
         
+        /* 仿翻頁鐘的中央分割線 */
+        .fliqlo-panel::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(0, 0, 0, 0.9);
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15);
+            z-index: 10;
+        }
+
         .flip-text {
             display: inline-block;
             transition: all 0.1s ease;
+            z-index: 5;
+            position: relative;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
         .flipping .flip-text {
-            animation: flipFlap 0.15s infinite alternate;
-            filter: blur(1px);
+            /* 調整速度：放慢 */
+            animation: flipFlap 0.3s infinite alternate ease-in-out;
+            filter: blur(0.5px);
         }
 
         @keyframes flipFlap {
             0% { transform: rotateX(0deg) scaleY(1); opacity: 1; }
-            100% { transform: rotateX(80deg) scaleY(0.5); opacity: 0.5; }
+            100% { transform: rotateX(90deg) scaleY(0.8); opacity: 0.6; }
         }
 
         /* 淡入動畫 */
@@ -141,14 +164,14 @@
         <section id="main-view" class="w-full max-w-md flex flex-col items-center justify-center w-full min-h-[60vh]">
             
             <div class="text-center w-full">
-                <!-- 翻牌顯示區 -->
-                <div class="flip-board-container bg-white dark:bg-darkCard rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-8 mb-8 h-48 flex items-center justify-center overflow-hidden relative">
-                    <div id="empty-state" class="text-gray-400 dark:text-gray-500 flex flex-col items-center hidden">
+                <!-- 翻牌顯示區 (Fliqlo Style) -->
+                <div class="fliqlo-panel w-full p-8 mb-8 h-48 flex items-center justify-center overflow-hidden relative">
+                    <div id="empty-state" class="text-gray-400 flex flex-col items-center hidden z-20">
                         <i class="fa-solid fa-box-open text-3xl mb-2"></i>
                         <p class="text-sm">尚未新增餐廳，請先至設定頁添加</p>
-                        <button onclick="app.switchView('edit')" class="mt-4 text-primary-600 text-sm font-medium hover:underline">前往設定</button>
+                        <button onclick="app.switchView('edit')" class="mt-4 text-primary-400 text-sm font-medium hover:underline">前往設定</button>
                     </div>
-                    <div id="flip-display" class="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-gray-100 flip-text text-center w-full break-words line-clamp-2">
+                    <div id="flip-display" class="text-3xl sm:text-4xl font-bold flip-text text-center w-full break-words line-clamp-2 px-4 z-0">
                         準備就緒
                     </div>
                 </div>
@@ -390,7 +413,7 @@
                 }
             }
 
-            // Spin Animation Logic
+            // Spin Animation Logic (Slower, Fliqlo style)
             function startSpin() {
                 if (state.restaurants.length === 0 || isSpinning) return;
                 
@@ -400,9 +423,9 @@
                 els.btnSpin.disabled = true;
                 els.spinBtnText.textContent = "隨機挑選中...";
 
-                let delay = 30; // initial speed
+                let delay = 80; // 放慢初始速度
                 let currentTick = 0;
-                const maxTicks = 40; // total number of flips
+                const maxTicks = 25; // 減少總次數，讓整體時間不會拖太長
                 let selectedRes = null;
 
                 function tick() {
@@ -413,9 +436,9 @@
                     currentTick++;
                     
                     if (currentTick < maxTicks) {
-                        // Decelerate
-                        if (currentTick > 25) delay += 15;
-                        if (currentTick > 35) delay += 30;
+                        // 更明顯的減速效果
+                        if (currentTick > 10) delay += 25;
+                        if (currentTick > 18) delay += 60;
                         setTimeout(tick, delay);
                     } else {
                         // End spin
@@ -639,8 +662,8 @@
                 const prompt = `你是一個在地美食嚮導。請根據所在地：「${state.location}」，幫我尋找方圓 1.5 公里內，Google Map 評分 4 星以上且評價破千的熱門聚餐餐廳。請回傳 5 到 8 家餐廳的資料。`;
 
                 try {
-                    // 使用適合外部環境的正式模型 gemini-1.5-flash
-                    const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    // 更新為 gemini-1.5-flash-latest，解決特定 API Key 的模型別名問題
+                    const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -688,7 +711,13 @@
                         
                         saveState();
                         renderList();
-                        showAiMsg(`成功新增 ${addedCount} 家餐廳！`, false, true);
+                        
+                        // 搜尋成功提示，並排程自動跳轉回首頁
+                        showAiMsg(`成功新增 ${addedCount} 家餐廳！正在為您導回主頁...`, false, true);
+                        setTimeout(() => {
+                            app.switchView('main');
+                        }, 1500);
+
                     } else {
                         throw new Error("格式解析錯誤或找不到結果");
                     }
@@ -706,7 +735,8 @@
                 els.aiMsg.textContent = msg;
                 els.aiMsg.className = `text-xs mt-2 block ${isError ? 'text-red-500' : (isSuccess ? 'text-green-500' : 'text-gray-500 dark:text-gray-400')}`;
                 if(isSuccess || isError) {
-                    setTimeout(() => els.aiMsg.classList.add('hidden'), 5000);
+                    // 如果是成功訊息，延長保留時間確保使用者能看到自動跳轉
+                    setTimeout(() => els.aiMsg.classList.add('hidden'), isSuccess ? 3000 : 5000);
                 } else {
                     els.aiMsg.classList.remove('hidden');
                 }
