@@ -786,8 +786,8 @@
                 const prompt = `你是一個在地美食嚮導。請根據所在地：「${state.location}」，幫我尋找方圓 1.5 公里內，Google Map 評分 4 星以上且評價破千的熱門聚餐餐廳。請回傳 5 到 8 家餐廳的資料。`;
 
                 try {
-                    // 適用於外部正式環境的模型 gemini-1.5-flash
-                    const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    // 更新為 gemini-2.5-flash
+                    const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
