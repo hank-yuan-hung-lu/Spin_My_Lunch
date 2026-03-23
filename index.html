@@ -593,6 +593,29 @@
                 renderList();
             }
 
+            // Exponential Backoff Fetch
+            async function fetchWithRetry(url, options) {
+                const delays = [1000, 2000, 4000, 8000, 16000];
+                let lastError;
+                
+                for (let i = 0; i <= delays.length; i++) {
+                    try {
+                        const res = await fetch(url, options);
+                        if (!res.ok) {
+                            const errData = await res.json().catch(() => ({}));
+                            throw new Error(errData.error?.message || `API 請求失敗: HTTP ${res.status}`);
+                        }
+                        return await res.json();
+                    } catch (err) {
+                        lastError = err;
+                        if (i < delays.length) {
+                            await new Promise(resolve => setTimeout(resolve, delays[i]));
+                        }
+                    }
+                }
+                throw lastError;
+            }
+
             // Gemini API Logic
             async function fetchAI() {
                 if (!state.location) {
@@ -600,18 +623,24 @@
                     return;
                 }
                 
-                const activeApiKey = state.apiKey || "";
+                if (!state.apiKey) {
+                    showAiMsg("請輸入有效的 Gemini API Key", true);
+                    return;
+                }
+                
+                const apiKey = state.apiKey; 
 
                 // UI Loading state
                 const btn = document.getElementById('btn-ai-fetch');
                 btn.disabled = true;
                 els.aiBtnText.innerHTML = '<div class="loader"></div>';
-                showAiMsg("AI 正在為您搜尋周邊美食...", false);
+                showAiMsg("AI 正在為您搜尋周邊美食，請稍候...", false);
 
-                const prompt = `你是一個在地美食嚮導。請根據所在地：「${state.location}」，幫我尋找方圓 1.5 公里內，Google Map 評分 4 星以上且評論數超過 1000 則的熱門聚餐餐廳。請回傳 5 到 8 家餐廳的資料。`;
+                const prompt = `你是一個在地美食嚮導。請根據所在地：「${state.location}」，幫我尋找方圓 1.5 公里內，Google Map 評分 4 星以上且評價破千的熱門聚餐餐廳。請回傳 5 到 8 家餐廳的資料。`;
 
                 try {
-                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeApiKey}`, {
+                    // 使用適合外部環境的正式模型 gemini-1.5-flash
+                    const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -619,31 +648,32 @@
                             generationConfig: {
                                 responseMimeType: "application/json",
                                 responseSchema: {
-                                    type: "ARRAY",
-                                    items: {
-                                        type: "OBJECT",
-                                        properties: {
-                                            id: { type: "STRING" },
-                                            name: { type: "STRING" },
-                                            address: { type: "STRING" },
-                                            phone: { type: "STRING" },
-                                            website: { type: "STRING" }
-                                        },
-                                        required: ["name", "address"]
-                                    }
+                                    type: "OBJECT",
+                                    properties: {
+                                        restaurants: {
+                                            type: "ARRAY",
+                                            items: {
+                                                type: "OBJECT",
+                                                properties: {
+                                                    id: { type: "STRING" },
+                                                    name: { type: "STRING" },
+                                                    address: { type: "STRING" },
+                                                    phone: { type: "STRING" },
+                                                    website: { type: "STRING" }
+                                                },
+                                                required: ["name", "address"]
+                                            }
+                                        }
+                                    },
+                                    required: ["restaurants"]
                                 }
                             }
                         })
                     });
 
-                    const data = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(data.error?.message || `API 請求失敗: ${response.status}`);
-                    }
-
                     const responseText = data.candidates[0].content.parts[0].text.trim();
-                    const newRestaurants = JSON.parse(responseText);
+                    const jsonResult = JSON.parse(responseText);
+                    const newRestaurants = jsonResult.restaurants;
 
                     if (Array.isArray(newRestaurants) && newRestaurants.length > 0) {
                         // Append to list, avoid exact name duplicates
@@ -665,7 +695,7 @@
 
                 } catch (error) {
                     console.error("AI Fetch Error:", error);
-                    showAiMsg(`搜尋失敗: ${error.message}`, true);
+                    showAiMsg(`搜尋失敗: ${error.message}，請稍後再試。`, true);
                 } finally {
                     btn.disabled = false;
                     els.aiBtnText.textContent = '自動搜尋';
