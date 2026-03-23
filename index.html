@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>★午餐救星｜今天午餐吃什麼！</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6', // Teal 500
+                            600: '#0d9488',
+                            900: '#134e4a',
+                        },
+                        darkBg: '#0f172a', // Slate 900
+                        darkCard: '#1e293b', // Slate 800
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans TC"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 翻牌動畫容器與效果 */
+        .flip-board-container {
+            perspective: 1000px;
+        }
+        
+        .flip-text {
+            display: inline-block;
+            transition: all 0.1s ease;
+        }
+
+        .flipping .flip-text {
+            animation: flipFlap 0.15s infinite alternate;
+            filter: blur(1px);
+        }
+
+        @keyframes flipFlap {
+            0% { transform: rotateX(0deg) scaleY(1); opacity: 1; }
+            100% { transform: rotateX(80deg) scaleY(0.5); opacity: 0.5; }
+        }
+
+        /* 淡入動畫 */
+        .fade-in {
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 列表拖曳動畫與樣式 */
+        .list-item {
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s;
+        }
+        
+        .list-item.dragging {
+            opacity: 0.5;
+            transform: scale(0.98);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        .list-item.drag-over {
+            border-top: 2px solid #14b8a6;
+        }
+
+        /* 捲軸美化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #475569;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #14b8a6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-darkBg dark:text-gray-100 transition-colors duration-300 min-h-screen flex flex-col">
+
+    <!-- Navbar -->
+    <header class="sticky top-0 z-50 bg-white/80 dark:bg-darkCard/80 backdrop-blur-md shadow-sm">
+        <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-2 text-primary-600 dark:text-primary-500 cursor-pointer" onclick="app.switchView('main')">
+                <i class="fa-solid fa-utensils text-xl"></i>
+                <h1 class="text-xl font-bold tracking-wide">今天午餐吃什麼！</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button onclick="app.toggleTheme()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition" aria-label="切換深淺色">
+                    <i id="theme-icon" class="fa-solid fa-moon text-gray-600 dark:text-gray-300"></i>
+                </button>
+                <button onclick="app.toggleView()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition" aria-label="設定">
+                    <i id="view-icon" class="fa-solid fa-gear text-gray-600 dark:text-gray-300"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col items-center justify-center p-4 max-w-4xl mx-auto w-full">
+        
+        <!-- ==================== MAIN VIEW ==================== -->
+        <section id="main-view" class="w-full max-w-md flex flex-col items-center justify-center w-full min-h-[60vh]">
+            
+            <div class="text-center w-full">
+                <!-- 翻牌顯示區 -->
+                <div class="flip-board-container bg-white dark:bg-darkCard rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-8 mb-8 h-48 flex items-center justify-center overflow-hidden relative">
+                    <div id="empty-state" class="text-gray-400 dark:text-gray-500 flex flex-col items-center hidden">
+                        <i class="fa-solid fa-box-open text-3xl mb-2"></i>
+                        <p class="text-sm">尚未新增餐廳，請先至設定頁添加</p>
+                        <button onclick="app.switchView('edit')" class="mt-4 text-primary-600 text-sm font-medium hover:underline">前往設定</button>
+                    </div>
+                    <div id="flip-display" class="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-gray-100 flip-text text-center w-full break-words line-clamp-2">
+                        準備就緒
+                    </div>
+                </div>
+
+                <!-- 結果詳細資訊卡片 -->
+                <div id="result-card" class="hidden w-full bg-white dark:bg-darkCard rounded-2xl shadow-lg border border-gray-100 dark:border-gray-800 p-6 mb-8 fade-in text-left">
+                    <h3 id="res-name" class="text-2xl font-bold mb-4 text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-700 pb-3">餐廳名稱</h3>
+                    
+                    <div class="space-y-3 mb-6 text-sm sm:text-base">
+                        <div class="flex items-start text-gray-600 dark:text-gray-300">
+                            <i class="fa-solid fa-location-dot mt-1 w-6 text-primary-500"></i>
+                            <span id="res-address">地址資訊</span>
+                        </div>
+                        <div class="flex items-start text-gray-600 dark:text-gray-300">
+                            <i class="fa-solid fa-phone mt-1 w-6 text-primary-500"></i>
+                            <span id="res-phone">電話資訊</span>
+                        </div>
+                        <div class="flex items-start text-gray-600 dark:text-gray-300">
+                            <i class="fa-solid fa-globe mt-1 w-6 text-primary-500"></i>
+                            <a id="res-website" href="#" target="_blank" class="text-primary-600 dark:text-primary-400 hover:underline break-all">網頁連結</a>
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-3">
+                        <a id="btn-nav" href="#" target="_blank" class="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-white py-3 rounded-xl flex items-center justify-center font-medium transition duration-200">
+                            <i class="fa-solid fa-map-location-dot mr-2"></i>導航
+                        </a>
+                        <a id="btn-call" href="#" class="flex-1 bg-primary-500 hover:bg-primary-600 text-white py-3 rounded-xl flex items-center justify-center font-medium shadow-md shadow-primary-500/30 transition duration-200">
+                            <i class="fa-solid fa-phone-volume mr-2"></i>訂位
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 抽籤按鈕 -->
+                <button id="btn-spin" onclick="app.startSpin()" class="w-full bg-gray-900 dark:bg-primary-600 hover:bg-gray-800 dark:hover:bg-primary-500 text-white text-lg font-bold py-4 rounded-xl shadow-xl transition-transform active:scale-95 duration-200 flex items-center justify-center">
+                    <i class="fa-solid fa-shuffle mr-2"></i>
+                    <span id="spin-btn-text">今天吃什麼？</span>
+                </button>
+            </div>
+        </section>
+
+
+        <!-- ==================== EDIT VIEW ==================== -->
+        <section id="edit-view" class="hidden w-full max-w-2xl fade-in pb-20">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fa-solid fa-list-check mr-2 text-primary-500"></i>管理餐廳清單
+            </h2>
+
+            <!-- AI 智能產生區塊 -->
+            <div class="bg-white dark:bg-darkCard rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6 mb-6 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 text-xs px-3 py-1 rounded-bl-lg font-medium">AI 助手</div>
+                <h3 class="text-lg font-bold mb-2 flex items-center">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-2 text-amber-500"></i>智慧探索附近美食
+                </h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">輸入地址與 API Key，自動尋找 1.5km 內、4星以上且評價破千的優質餐廳。</p>
+                
+                <div class="space-y-3">
+                    <input type="text" id="input-location" placeholder="例如：台北市信義區松智路1號" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                    <div class="flex space-x-2">
+                        <input type="password" id="input-api-key" placeholder="輸入您的 Gemini API Key" class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition text-sm">
+                        <button onclick="app.fetchAI()" id="btn-ai-fetch" class="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg font-medium transition whitespace-nowrap min-w-[100px]">
+                            <span id="ai-btn-text">自動搜尋</span>
+                        </button>
+                    </div>
+                    <p id="ai-msg" class="text-xs text-red-500 hidden mt-1"></p>
+                </div>
+            </div>
+
+            <!-- 手動新增區塊 -->
+            <div class="bg-white dark:bg-darkCard rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6 mb-6">
+                <h3 class="text-lg font-bold mb-4 flex items-center">
+                    <i class="fa-solid fa-plus mr-2 text-gray-500 dark:text-gray-400"></i>手動新增
+                </h3>
+                <form id="form-manual" onsubmit="app.addRestaurant(event)" class="space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input type="text" id="m-name" required placeholder="餐廳名稱 *" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 outline-none">
+                        <input type="text" id="m-phone" placeholder="電話" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 outline-none">
+                    </div>
+                    <input type="text" id="m-address" placeholder="地址" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 outline-none">
+                    <div class="flex space-x-2">
+                        <input type="url" id="m-website" placeholder="網址 (選填)" class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary-500 outline-none">
+                        <button type="submit" class="bg-gray-800 dark:bg-gray-700 hover:bg-gray-900 dark:hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-medium transition">
+                            新增
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 餐廳清單 -->
+            <div>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold">目前清單 (<span id="list-count">0</span>)</h3>
+                    <button onclick="app.clearAll()" class="text-sm text-red-500 hover:text-red-600 hover:underline transition">清空全部</button>
+                </div>
+                <ul id="restaurant-list" class="space-y-2">
+                    <!-- List items will be rendered here -->
+                </ul>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- JS Logic -->
+    <script>
+        const app = (function() {
+            // State
+            let state = {
+                view: 'main', // 'main' or 'edit'
+                theme: 'light',
+                restaurants: [],
+                location: '',
+                apiKey: ''
+            };
+
+            // DOM Elements
+            const els = {
+                html: document.documentElement,
+                mainView: document.getElementById('main-view'),
+                editView: document.getElementById('edit-view'),
+                themeIcon: document.getElementById('theme-icon'),
+                viewIcon: document.getElementById('view-icon'),
+                
+                // Main View
+                flipDisplay: document.getElementById('flip-display'),
+                emptyState: document.getElementById('empty-state'),
+                resultCard: document.getElementById('result-card'),
+                btnSpin: document.getElementById('btn-spin'),
+                spinBtnText: document.getElementById('spin-btn-text'),
+                resName: document.getElementById('res-name'),
+                resAddress: document.getElementById('res-address'),
+                resPhone: document.getElementById('res-phone'),
+                resWebsite: document.getElementById('res-website'),
+                btnNav: document.getElementById('btn-nav'),
+                btnCall: document.getElementById('btn-call'),
+                
+                // Edit View
+                listContainer: document.getElementById('restaurant-list'),
+                listCount: document.getElementById('list-count'),
+                inputLocation: document.getElementById('input-location'),
+                inputApiKey: document.getElementById('input-api-key'),
+                aiBtnText: document.getElementById('ai-btn-text'),
+                aiMsg: document.getElementById('ai-msg'),
+                formManual: document.getElementById('form-manual')
+            };
+
+            // Drag & Drop State
+            let dragStartIndex = null;
+            let isSpinning = false;
+
+            // Initialize
+            function init() {
+                loadState();
+                applyTheme();
+                renderList();
+                updateMainViewState();
+                
+                // Set initial inputs
+                els.inputLocation.value = state.location;
+                els.inputApiKey.value = state.apiKey;
+                
+                // Input listeners for auto-save
+                els.inputLocation.addEventListener('input', (e) => { state.location = e.target.value; saveState(); });
+                els.inputApiKey.addEventListener('input', (e) => { state.apiKey = e.target.value; saveState(); });
+            }
+
+            // Storage
+            function loadState() {
+                const saved = localStorage.getItem('lunchApp_state');
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        state = { ...state, ...parsed };
+                    } catch(e) { console.error("Failed to parse local storage", e); }
+                }
+            }
+
+            function saveState() {
+                localStorage.setItem('lunchApp_state', JSON.stringify({
+                    theme: state.theme,
+                    restaurants: state.restaurants,
+                    location: state.location,
+                    apiKey: state.apiKey
+                }));
+            }
+
+            // UI Controllers
+            function applyTheme() {
+                if (state.theme === 'dark') {
+                    els.html.classList.add('dark');
+                    els.themeIcon.classList.replace('fa-moon', 'fa-sun');
+                } else {
+                    els.html.classList.remove('dark');
+                    els.themeIcon.classList.replace('fa-sun', 'fa-moon');
+                }
+            }
+
+            function toggleTheme() {
+                state.theme = state.theme === 'light' ? 'dark' : 'light';
+                applyTheme();
+                saveState();
+            }
+
+            function switchView(viewName) {
+                if(isSpinning) return;
+                state.view = viewName;
+                if (viewName === 'main') {
+                    els.mainView.classList.remove('hidden');
+                    els.editView.classList.add('hidden');
+                    els.viewIcon.classList.replace('fa-house', 'fa-gear');
+                    updateMainViewState();
+                } else {
+                    els.mainView.classList.add('hidden');
+                    els.editView.classList.remove('hidden');
+                    els.viewIcon.classList.replace('fa-gear', 'fa-house');
+                    renderList();
+                }
+            }
+
+            function toggleView() {
+                switchView(state.view === 'main' ? 'edit' : 'main');
+            }
+
+            function updateMainViewState() {
+                els.resultCard.classList.add('hidden');
+                els.flipDisplay.parentElement.classList.remove('flipping');
+                
+                if (state.restaurants.length === 0) {
+                    els.emptyState.classList.remove('hidden');
+                    els.flipDisplay.classList.add('hidden');
+                    els.btnSpin.disabled = true;
+                    els.btnSpin.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    els.emptyState.classList.add('hidden');
+                    els.flipDisplay.classList.remove('hidden');
+                    els.flipDisplay.textContent = "準備就緒";
+                    els.btnSpin.disabled = false;
+                    els.btnSpin.classList.remove('opacity-50', 'cursor-not-allowed');
+                    els.spinBtnText.textContent = "今天吃什麼？";
+                }
+            }
+
+            // Spin Animation Logic
+            function startSpin() {
+                if (state.restaurants.length === 0 || isSpinning) return;
+                
+                isSpinning = true;
+                els.resultCard.classList.add('hidden');
+                els.flipDisplay.parentElement.classList.add('flipping');
+                els.btnSpin.disabled = true;
+                els.spinBtnText.textContent = "隨機挑選中...";
+
+                let delay = 30; // initial speed
+                let currentTick = 0;
+                const maxTicks = 40; // total number of flips
+                let selectedRes = null;
+
+                function tick() {
+                    // Random pick for visual
+                    const tempRes = state.restaurants[Math.floor(Math.random() * state.restaurants.length)];
+                    els.flipDisplay.textContent = tempRes.name;
+
+                    currentTick++;
+                    
+                    if (currentTick < maxTicks) {
+                        // Decelerate
+                        if (currentTick > 25) delay += 15;
+                        if (currentTick > 35) delay += 30;
+                        setTimeout(tick, delay);
+                    } else {
+                        // End spin
+                        selectedRes = state.restaurants[Math.floor(Math.random() * state.restaurants.length)];
+                        finishSpin(selectedRes);
+                    }
+                }
+                
+                setTimeout(tick, delay);
+            }
+
+            function finishSpin(restaurant) {
+                isSpinning = false;
+                els.flipDisplay.parentElement.classList.remove('flipping');
+                els.flipDisplay.textContent = restaurant.name;
+                
+                // Populate Result Card
+                els.resName.textContent = restaurant.name;
+                els.resAddress.textContent = restaurant.address || '無地址資訊';
+                els.resPhone.textContent = restaurant.phone || '無電話資訊';
+                
+                if (restaurant.website) {
+                    els.resWebsite.textContent = restaurant.website;
+                    els.resWebsite.href = restaurant.website;
+                    els.resWebsite.parentElement.classList.remove('hidden');
+                } else {
+                    els.resWebsite.parentElement.classList.add('hidden');
+                }
+
+                // Action Buttons
+                if (restaurant.address) {
+                    els.btnNav.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(restaurant.name + ' ' + restaurant.address)}`;
+                    els.btnNav.classList.remove('hidden');
+                } else {
+                    els.btnNav.classList.add('hidden');
+                }
+
+                if (restaurant.phone) {
+                    els.btnCall.href = `tel:${restaurant.phone.replace(/[^0-9]/g, '')}`;
+                    els.btnCall.classList.remove('hidden');
+                } else if (restaurant.website) {
+                    els.btnCall.href = restaurant.website;
+                    els.btnCall.target = "_blank";
+                    els.btnCall.innerHTML = '<i class="fa-solid fa-globe mr-2"></i>前往網頁';
+                    els.btnCall.classList.remove('hidden');
+                } else {
+                    els.btnCall.classList.add('hidden');
+                }
+
+                // Show Card & Reset Spin Button
+                els.resultCard.classList.remove('hidden');
+                els.btnSpin.disabled = false;
+                els.spinBtnText.textContent = "再轉一次";
+            }
+
+            // List Management (Edit View)
+            function generateId() {
+                return Math.random().toString(36).substr(2, 9);
+            }
+
+            function addRestaurant(e) {
+                e.preventDefault();
+                const name = document.getElementById('m-name').value.trim();
+                const phone = document.getElementById('m-phone').value.trim();
+                const address = document.getElementById('m-address').value.trim();
+                const website = document.getElementById('m-website').value.trim();
+
+                if (!name) return;
+
+                const newRes = { id: generateId(), name, phone, address, website };
+                state.restaurants.unshift(newRes); // Add to top
+                
+                saveState();
+                renderList();
+                els.formManual.reset();
+            }
+
+            function deleteRestaurant(id) {
+                state.restaurants = state.restaurants.filter(r => r.id !== id);
+                saveState();
+                renderList();
+            }
+            
+            function clearAll() {
+                if(confirm("確定要清空所有餐廳嗎？此動作無法復原。")) {
+                    state.restaurants = [];
+                    saveState();
+                    renderList();
+                }
+            }
+
+            function renderList() {
+                els.listCount.textContent = state.restaurants.length;
+                els.listContainer.innerHTML = '';
+                
+                if (state.restaurants.length === 0) {
+                    els.listContainer.innerHTML = `<li class="text-center text-gray-400 py-6 text-sm">目前沒有餐廳，請新增或使用 AI 搜尋</li>`;
+                    return;
+                }
+
+                state.restaurants.forEach((res, index) => {
+                    const li = document.createElement('li');
+                    li.className = 'list-item bg-white dark:bg-darkCard border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex justify-between items-center cursor-move';
+                    li.draggable = true;
+                    li.dataset.index = index;
+                    
+                    li.innerHTML = `
+                        <div class="flex items-center flex-1 min-w-0 pr-4">
+                            <i class="fa-solid fa-grip-vertical text-gray-300 dark:text-gray-600 mr-3 hidden sm:block"></i>
+                            <div class="truncate">
+                                <p class="font-bold text-gray-800 dark:text-gray-100 truncate">${res.name}</p>
+                                ${res.address ? `<p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">${res.address}</p>` : ''}
+                            </div>
+                        </div>
+                        <button onclick="app.deleteRestaurant('${res.id}')" class="text-gray-400 hover:text-red-500 transition px-2 py-1 rounded" title="刪除">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    `;
+
+                    // Drag Events
+                    li.addEventListener('dragstart', handleDragStart);
+                    li.addEventListener('dragover', handleDragOver);
+                    li.addEventListener('drop', handleDrop);
+                    li.addEventListener('dragenter', handleDragEnter);
+                    li.addEventListener('dragleave', handleDragLeave);
+                    li.addEventListener('dragend', handleDragEnd);
+
+                    els.listContainer.appendChild(li);
+                });
+            }
+
+            // Drag and Drop Handlers
+            function handleDragStart(e) {
+                dragStartIndex = +this.dataset.index;
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => this.classList.add('dragging'), 0);
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            }
+
+            function handleDragEnter(e) {
+                e.preventDefault();
+                this.classList.add('drag-over');
+            }
+
+            function handleDragLeave() {
+                this.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                e.stopPropagation();
+                this.classList.remove('drag-over');
+                
+                const dragEndIndex = +this.dataset.index;
+                if (dragStartIndex !== dragEndIndex && dragStartIndex !== null) {
+                    swapItems(dragStartIndex, dragEndIndex);
+                }
+                return false;
+            }
+            
+            function handleDragEnd() {
+                this.classList.remove('dragging');
+                document.querySelectorAll('.list-item').forEach(el => el.classList.remove('drag-over'));
+            }
+
+            function swapItems(fromIndex, toIndex) {
+                const itemOne = state.restaurants[fromIndex];
+                state.restaurants.splice(fromIndex, 1);
+                state.restaurants.splice(toIndex, 0, itemOne);
+                saveState();
+                renderList();
+            }
+
+            // Gemini API Logic
+            async function fetchAI() {
+                if (!state.location) {
+                    showAiMsg("請先輸入您的地址或大概位置", true);
+                    return;
+                }
+                
+                const activeApiKey = state.apiKey || "";
+
+                // UI Loading state
+                const btn = document.getElementById('btn-ai-fetch');
+                btn.disabled = true;
+                els.aiBtnText.innerHTML = '<div class="loader"></div>';
+                showAiMsg("AI 正在為您搜尋周邊美食...", false);
+
+                const prompt = `你是一個在地美食嚮導。請根據所在地：「${state.location}」，幫我尋找方圓 1.5 公里內，Google Map 評分 4 星以上且評論數超過 1000 則的熱門聚餐餐廳。請回傳 5 到 8 家餐廳的資料。`;
+
+                try {
+                    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeApiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: {
+                                responseMimeType: "application/json",
+                                responseSchema: {
+                                    type: "ARRAY",
+                                    items: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            id: { type: "STRING" },
+                                            name: { type: "STRING" },
+                                            address: { type: "STRING" },
+                                            phone: { type: "STRING" },
+                                            website: { type: "STRING" }
+                                        },
+                                        required: ["name", "address"]
+                                    }
+                                }
+                            }
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error?.message || `API 請求失敗: ${response.status}`);
+                    }
+
+                    const responseText = data.candidates[0].content.parts[0].text.trim();
+                    const newRestaurants = JSON.parse(responseText);
+
+                    if (Array.isArray(newRestaurants) && newRestaurants.length > 0) {
+                        // Append to list, avoid exact name duplicates
+                        let addedCount = 0;
+                        newRestaurants.forEach(nr => {
+                            if (!state.restaurants.find(r => r.name === nr.name)) {
+                                if(!nr.id) nr.id = generateId();
+                                state.restaurants.push(nr);
+                                addedCount++;
+                            }
+                        });
+                        
+                        saveState();
+                        renderList();
+                        showAiMsg(`成功新增 ${addedCount} 家餐廳！`, false, true);
+                    } else {
+                        throw new Error("格式解析錯誤或找不到結果");
+                    }
+
+                } catch (error) {
+                    console.error("AI Fetch Error:", error);
+                    showAiMsg(`搜尋失敗: ${error.message}`, true);
+                } finally {
+                    btn.disabled = false;
+                    els.aiBtnText.textContent = '自動搜尋';
+                }
+            }
+
+            function showAiMsg(msg, isError, isSuccess = false) {
+                els.aiMsg.textContent = msg;
+                els.aiMsg.className = `text-xs mt-2 block ${isError ? 'text-red-500' : (isSuccess ? 'text-green-500' : 'text-gray-500 dark:text-gray-400')}`;
+                if(isSuccess || isError) {
+                    setTimeout(() => els.aiMsg.classList.add('hidden'), 5000);
+                } else {
+                    els.aiMsg.classList.remove('hidden');
+                }
+            }
+
+            // Expose public methods
+            return {
+                init,
+                toggleTheme,
+                switchView,
+                toggleView,
+                startSpin,
+                addRestaurant,
+                deleteRestaurant,
+                clearAll,
+                fetchAI
+            };
+        })();
+
+        // Start App on DOM Ready
+        document.addEventListener('DOMContentLoaded', app.init);
+    </script>
+</body>
+</html>
