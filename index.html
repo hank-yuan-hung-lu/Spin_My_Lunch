@@ -264,7 +264,17 @@
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">輸入地址與 API Key，自動將附近 4星以上餐廳加入<span class="font-bold text-primary-600 dark:text-primary-400">目前群組</span>。</p>
                 
                 <div class="space-y-3">
-                    <input type="text" id="input-location" placeholder="例如：台北市信義區松智路1號" class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                    <div class="flex space-x-2">
+                        <input type="text" id="input-location" placeholder="例如：台北市信義區松智路1號" class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition">
+                        <select id="input-distance" class="px-2 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition text-sm w-24 sm:w-28 cursor-pointer">
+                            <option value="0.5">0.5 km</option>
+                            <option value="1">1 km</option>
+                            <option value="1.5">1.5 km</option>
+                            <option value="2">2 km</option>
+                            <option value="3">3 km</option>
+                            <option value="5">5 km</option>
+                        </select>
+                    </div>
                     <div class="flex space-x-2">
                         <input type="password" id="input-api-key" placeholder="輸入您的 Gemini API Key" class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition text-sm">
                         <button onclick="app.fetchAI()" id="btn-ai-fetch" class="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg font-medium transition whitespace-nowrap min-w-[100px]">
@@ -308,7 +318,8 @@
                 groups: [{ id: 'group_default', name: '預設群組', restaurants: [] }],
                 activeGroupId: 'group_default',
                 location: '',
-                apiKey: ''
+                apiKey: '',
+                distance: '1.5' // Default distance
             };
 
             // DOM Elements
@@ -338,6 +349,7 @@
                 listContainer: document.getElementById('restaurant-list'),
                 listCount: document.getElementById('list-count'),
                 inputLocation: document.getElementById('input-location'),
+                inputDistance: document.getElementById('input-distance'),
                 inputApiKey: document.getElementById('input-api-key'),
                 aiBtnText: document.getElementById('ai-btn-text'),
                 aiMsg: document.getElementById('ai-msg'),
@@ -358,10 +370,12 @@
                 // Set initial inputs
                 els.inputLocation.value = state.location;
                 els.inputApiKey.value = state.apiKey;
+                els.inputDistance.value = state.distance || '1.5';
                 
                 // Input listeners for auto-save
                 els.inputLocation.addEventListener('input', (e) => { state.location = e.target.value; saveState(); });
                 els.inputApiKey.addEventListener('input', (e) => { state.apiKey = e.target.value; saveState(); });
+                els.inputDistance.addEventListener('change', (e) => { state.distance = e.target.value; saveState(); });
             }
 
             // Storage & Migration
@@ -400,7 +414,8 @@
                     groups: state.groups,
                     activeGroupId: state.activeGroupId,
                     location: state.location,
-                    apiKey: state.apiKey
+                    apiKey: state.apiKey,
+                    distance: state.distance
                 }));
             }
 
@@ -776,14 +791,15 @@
                 
                 const apiKey = state.apiKey; 
                 const activeGroup = getActiveGroup();
+                const distance = state.distance || '1.5';
 
                 // UI Loading state
                 const btn = document.getElementById('btn-ai-fetch');
                 btn.disabled = true;
                 els.aiBtnText.innerHTML = '<div class="loader"></div>';
-                showAiMsg("AI 正在為您搜尋周邊美食，請稍候...", false);
+                showAiMsg(`AI 正在為您搜尋 ${distance} 公里內的美食，請稍候...`, false);
 
-                const prompt = `你是一個在地美食嚮導。請根據所在地：「${state.location}」，幫我尋找方圓 1.5 公里內，Google Map 評分 4 星以上且評價破千的熱門聚餐餐廳。請回傳 5 到 8 家餐廳的資料。`;
+                const prompt = `你是一個在地美食嚮導。請根據所在地：「${state.location}」，幫我尋找方圓 ${distance} 公里內，Google Map 評分 4 星以上且評價破千的熱門聚餐餐廳。請回傳 5 到 8 家餐廳的資料。`;
 
                 try {
                     // 更新為 gemini-2.5-flash
