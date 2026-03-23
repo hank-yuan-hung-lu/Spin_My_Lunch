@@ -163,14 +163,14 @@
         <!-- ==================== MAIN VIEW ==================== -->
         <section id="main-view" class="w-full max-w-md flex flex-col items-center justify-center w-full min-h-[60vh]">
             
-            <div class="text-center w-full relative mt-4">
-                <!-- 群組標籤 -->
-                <div id="main-group-badge" class="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-primary-100 dark:bg-primary-900/80 text-primary-700 dark:text-primary-300 px-4 py-1 rounded-full text-xs font-bold z-10 shadow-sm border border-primary-200 dark:border-primary-800 truncate max-w-[80%]">
+            <div class="text-center w-full relative mt-8">
+                <!-- 群組標籤 (稍微拉高距離) -->
+                <div id="main-group-badge" class="absolute -top-7 left-1/2 transform -translate-x-1/2 bg-primary-100 dark:bg-primary-900/80 text-primary-700 dark:text-primary-300 px-4 py-1 rounded-full text-xs font-bold z-10 shadow-sm border border-primary-200 dark:border-primary-800 truncate max-w-[80%]">
                     預設群組
                 </div>
 
                 <!-- 翻牌顯示區 (Fliqlo Style) -->
-                <div class="fliqlo-panel w-full p-8 mb-8 h-48 flex items-center justify-center overflow-hidden relative mt-2">
+                <div class="fliqlo-panel w-full p-8 mb-8 h-48 flex items-center justify-center overflow-hidden relative mt-4">
                     <div id="empty-state" class="text-gray-400 flex flex-col items-center hidden z-20">
                         <i class="fa-solid fa-box-open text-3xl mb-2"></i>
                         <p class="text-sm">此群組尚未新增餐廳</p>
@@ -786,8 +786,8 @@
                 const prompt = `你是一個在地美食嚮導。請根據所在地：「${state.location}」，幫我尋找方圓 1.5 公里內，Google Map 評分 4 星以上且評價破千的熱門聚餐餐廳。請回傳 5 到 8 家餐廳的資料。`;
 
                 try {
-                    // 更新回 2.5 版本
-                    const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    // 適用於外部正式環境的模型 gemini-1.5-flash
+                    const data = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
